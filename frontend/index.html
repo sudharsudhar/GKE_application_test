@@ -1,0 +1,23 @@
+<!-- frontend/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microservices Demo</title>
+</head>
+<body>
+    <h1>Frontend Microservice</h1>
+    <div id="data"></div>
+
+    <script>
+        async function fetchData() {
+            const response = await fetch('/api/data');
+            const data = await response.json();
+            document.getElementById('data').innerText = `Data from backend: ${data.data}`;
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>
