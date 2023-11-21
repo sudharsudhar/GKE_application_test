@@ -12,6 +12,12 @@ pipeline {
     }
 
     stages {
+        stage('Check Docker') {
+            steps {
+                sh 'docker --version'
+            }
+        }
+
         stage('Checkout') {
             steps {
                 checkout([$class: 'GitSCM', branches: [[name: BRANCH_NAME]], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: '', url: REPO_URL]]])
