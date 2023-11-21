@@ -1,56 +1,55 @@
 pipeline {
     agent any
-    
-    stages {
-        stage('Build Backend') {
-            steps {
-                script {
-                    // Checkout code from GitHub
-                    checkout([$class: 'GitSCM', branches: [[name: 'main']], userRemoteConfigs: [[url: 'https://github.com/sudharsudhar/GKE_application_test.git']]])
 
-                    // Build Docker image for backend
-                    sh 'docker build -t gcr.io/glass-handler-404405/backend:latest backend/'
+    environment {
+        GCP_PROJECT_ID = 'glass-handler-404405'
+        GCR_REGISTRY = "gcr.io/${GCP_PROJECT_ID}"
+        GCP_CREDENTIALS_ID = '79678c88-89d8-47b2-a06c-88f19118b6d6'
+        FRONTEND_NAMESPACE = 'frontend'
+        BACKEND_NAMESPACE = 'backend'
+        REPO_URL = 'https://github.com/sudharsudhar/GKE_application_test.git'
+        BRANCH_NAME = 'main'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: BRANCH_NAME]], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: '', url: REPO_URL]]])
+            }
+        }
+
+        stage('Build and Push Frontend Image') {
+            when {
+                changeset "**/frontend/*"
+            }
+            steps {
+                script {
+                    docker.withRegistry('https://gcr.io', GCP_CREDENTIALS_ID) {
+                        def frontendImage = docker.build("${GCR_REGISTRY}/frontend:${env.BUILD_NUMBER}", './frontend')
+
+                        frontendImage.push()
+
+                        // Trigger rollout restart for frontend namespace
+                        sh "kubectl rollout restart deployment -n ${FRONTEND_NAMESPACE}"
+                    }
                 }
             }
         }
-        stage('Push Backend to Registry') {
-            steps {
-                script {
-                    // Push Docker image to GCR
-                    sh 'docker push gcr.io/glass-handler-404405/backend:latest'
-                }
+
+        stage('Build and Push Backend Image') {
+            when {
+                changeset "**/backend/*"
             }
-        }
-        stage('Deploy Backend to GKE') {
             steps {
                 script {
-                    // Trigger rolling restart of GKE deployment for backend
-                    sh 'kubectl rollout restart deployment backend'
-                }
-            }
-        }
-        
-        stage('Build Frontend') {
-            steps {
-                script {
-                    // Build Docker image for frontend
-                    sh 'docker build -t gcr.io/glass-handler-404405/frontend:latest frontend/'
-                }
-            }
-        }
-        stage('Push Frontend to Registry') {
-            steps {
-                script {
-                    // Push Docker image to GCR
-                    sh 'docker push gcr.io/glass-handler-404405/frontend:latest'
-                }
-            }
-        }
-        stage('Deploy Frontend to GKE') {
-            steps {
-                script {
-                    // Trigger rolling restart of GKE deployment for frontend
-                    sh 'kubectl rollout restart deployment frontend'
+                    docker.withRegistry('https://gcr.io', GCP_CREDENTIALS_ID) {
+                        def backendImage = docker.build("${GCR_REGISTRY}/backend:${env.BUILD_NUMBER}", './backend')
+
+                        backendImage.push()
+
+                        // Trigger rollout restart for backend namespace
+                        sh "kubectl rollout restart deployment -n ${BACKEND_NAMESPACE}"
+                    }
                 }
             }
         }
